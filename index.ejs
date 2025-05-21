@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>睡眠記録アプリ</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h1>🛌 睡眠記録アプリ</h1>
+
+  <!-- 保存・更新メッセージ表示 -->
+  <% if (updated) { %>
+    <div style="color: blue;">✏️ 記録が上書きされました</div>
+  <% } %>
+  <% if (saved) { %>
+    <div style="color: green;">✅ 新しい記録が保存されました</div>
+  <% } %>
+
+  <!-- 入力フォーム（新規または編集） -->
+  <form action="/sleep" method="POST">
+    <% if (editData) { %>
+      <input type="hidden" name="id" value="<%= editData.id %>">
+    <% } %>
+    <p><label>日付: <input type="date" name="date" value="<%= editData ? editData.date : '' %>" required></label></p>
+    <p><label>就寝: <input type="time" name="sleep_start" value="<%= editData ? editData.sleep_start : '' %>" required></label></p>
+    <p><label>起床: <input type="time" name="sleep_end" value="<%= editData ? editData.sleep_end : '' %>" required></label></p>
+    <p><label>質（1〜5）: <input type="number" name="sleep_quality" min="1" max="5" value="<%= editData ? editData.sleep_quality : '' %>" required></label></p>
+    <p>
+      <label><input type="checkbox" name="caffeine" value="1" <%= editData && editData.caffeine ? 'checked' : '' %>> カフェイン</label>
+      <label><input type="checkbox" name="smartphone" value="1" <%= editData && editData.smartphone ? 'checked' : '' %>> スマホ</label>
+      <label><input type="checkbox" name="exercise" value="1" <%= editData && editData.exercise ? 'checked' : '' %>> 運動</label>
+    </p>
+    <p><label>就寝前メモ: <input type="text" name="note" value="<%= editData ? editData.note : '' %>"></label></p>
+    <button type="submit"><%= editData ? '更新' : '記録' %></button>
+  </form>
+
+  <!-- 折れ線グラフ -->
+  <h2>📈 睡眠の質の推移</h2>
+  <canvas id="sleepChart" width="400" height="100"></canvas>
+
+  <!-- 週・月平均グラフ -->
+  <h2>📊 週ごとの平均</h2>
+  <canvas id="weeklyAvgChart" width="400" height="100"></canvas>
+
+  <h2>📊 月ごとの平均</h2>
+  <canvas id="monthlyAvgChart" width="400" height="100"></canvas>
+
+  <!-- 最近の記録表示 -->
+  <h2>📅 最近の記録</h2>
+  <table border="1">
+    <tr>
+      <th>日付</th><th>就寝</th><th>起床</th><th>質</th>
+      <th>カフェイン</th><th>スマホ</th><th>運動</th><th>メモ</th><th>操作</th>
+    </tr>
+    <% history.forEach(item => { %>
+      <tr>
+        <td><%= item.date %></td>
+        <td><%= item.sleep_start %></td>
+        <td><%= item.sleep_end %></td>
+        <td><%= item.sleep_quality %></td>
+        <td><%= item.caffeine ? '✅' : '' %></td>
+        <td><%= item.smartphone ? '✅' : '' %></td>
+        <td><%= item.exercise ? '✅' : '' %></td>
+        <td><%= item.note %></td>
+        <td>
+          <form action="/edit/<%= item.id %>" method="GET" style="display:inline">
+            <button type="submit">編集</button>
+          </form>
+          <form action="/delete/<%= item.id %>" method="POST" style="display:inline">
+            <button type="submit">削除</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+
+  <!-- Chart.js スクリプト -->
+  <script>
+    // 睡眠の質推移（古い順）
+    const sortedHistory = <%- JSON.stringify(history) %>.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const labels = sortedHistory.map(item => item.date);
+    const data = sortedHistory.map(item => item.sleep_quality);
+
+    new Chart(document.getElementById('sleepChart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '睡眠の質',
+          data: data,
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        scales: {
+          y: {
+            min: 0,
+            max: 5
+          }
+        }
+      }
+    });
+
+    // 平均グラフ（週・月）
+    const weekData = <%- JSON.stringify(weekAverages) %>;
+    const monthData = <%- JSON.stringify(monthAverages) %>;
+
+    new Chart(document.getElementById('weeklyAvgChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: weekData.map(d => d.label),
+        datasets: [{
+          label: '週平均',
+          data: weekData.map(d => d.avg),
+          backgroundColor: 'rgba(75, 192, 192, 0.4)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1
+        }]
+      }
+    });
+
+    new Chart(document.getElementById('monthlyAvgChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: monthData.map(d => d.label),
+        datasets: [{
+          label: '月平均',
+          data: monthData.map(d => d.avg),
+          backgroundColor: 'rgba(255, 159, 64, 0.4)',
+          borderColor: 'rgba(255, 159, 64, 1)',
+          borderWidth: 1
+        }]
+      }
+    });
+  </script>
+</body>
+</html>
